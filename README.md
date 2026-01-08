@@ -1,105 +1,98 @@
-# PolyglotMicro: Sistema de E-Commerce Distribuido y Escalable
+# PolyglotMicro: Ecosistema de Microservicios Políglota
 
-![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![Coverage](https://img.shields.io/badge/coverage-95%25-green) ![Architecture](https://img.shields.io/badge/architecture-microservices-blue)
+![Build Status](https://img.shields.io/badge/build-passing-brightgreen) ![Architecture](https://img.shields.io/badge/architecture-microservices-blue) ![Docker](https://img.shields.io/badge/container-docker-2496ED)
 
 ## 📖 Visión General
-**PolyglotMicro** es una arquitectura de referencia para sistemas de comercio electrónico de alto rendimiento. Este proyecto demuestra la implementación de un ecosistema de **microservicios políglota**, orquestando las fortalezas de **Go, Python y Node.js** para resolver problemas específicos de dominio.
 
-El objetivo no es solo procesar órdenes, sino demostrar patrones de **resiliencia, consistencia eventual y comunicación asíncrona**.
+**PolyglotMicro** es una arquitectura de referencia diseñada para demostrar la implementación de un sistema de comercio electrónico distribuido, escalable y resiliente. 
 
-### 🚀 Stack Tecnológico y Decisiones de Arquitectura
+Este proyecto orquesta un ecosistema **políglota** aprovechando las fortalezas nativas de cada lenguaje:
+* **Node.js** para I/O no bloqueante en el Gateway.
+* **Go (Golang)** para procesamiento transaccional de alta concurrencia.
+* **Python** para análisis de datos asíncronos.
+* **PHP** para integración de servicios de notificación.
 
-| Servicio | Tecnología | Rol | ¿Por qué esta elección? |
-| :--- | :--- | :--- | :--- |
-| **API Gateway** | **Node.js (NestJS) + TypeScript** | Puerta de Enlace | Manejo eficiente de I/O no bloqueante y tipado estricto para orquestar peticiones al cliente. |
-| **Inventory Core** | **Go (Golang) + gRPC** | Gestión de Stock | **Alta concurrencia**. Go maneja miles de transacciones de bloqueo de inventario con latencia mínima. |
-| **Data & Analytics** | **Python (FastAPI)** | Análisis de Ventas | Aprovecha el ecosistema de Data Science (Pandas) para procesar métricas en tiempo real. |
-| **Notifications** | **PHP (Symfony)** | Webhooks & Emails | Estabilidad y robustez para integraciones de terceros y despacho de correos. |
-| **Infraestructura** | **RabbitMQ & Redis** | Broker & Caché | Desacoplamiento de servicios mediante eventos (Event-Driven Architecture). |
+El sistema implementa patrones avanzados como **API Gateway**, **Database per Service**, **Event-Driven Architecture (RabbitMQ)** y comunicación híbrida **gRPC/REST**.
 
 ---
 
-## 🏗 Arquitectura
+## 🚀 Stack Tecnológico
 
-El sistema utiliza un patrón **API Gateway** con comunicación híbrida:
-* **Síncrona (gRPC):** Para operaciones críticas donde la latencia es vital (ej. verificar stock antes de pagar).
-* **Asíncrona (RabbitMQ):** Para operaciones secundarias (ej. enviar email de confirmación, actualizar dashboard de analítica).
+| Servicio | Tecnología | Rol | Decisión de Arquitectura |
+| :--- | :--- | :--- | :--- |
+| **API Gateway** | **NestJS (Node.js)** | Orquestador | Manejo eficiente de peticiones HTTP, validación (DTOs) y documentación automática (Swagger). |
+| **Inventory** | **Go (Golang) + gRPC** | Core Transaccional | **Alta performance**. Gestión de stock con latencia mínima y comunicación binaria (Protobuf). |
+| **Analytics** | **Python (FastAPI)** | Worker Asíncrono | Consumidor de eventos para procesar métricas de ventas en background. |
+| **Notifications** | **PHP 8.2** | Worker Asíncrono | Script de consumo robusto para despacho de correos simulados. |
+| **Data Stores** | **PostgreSQL & MongoDB** | Persistencia | Patrón *Database per Service*: Relacional para stock (ACID), Documental para analítica. |
+| **Infraestructura** | **RabbitMQ & Docker** | Mensajería & Run | Desacoplamiento total de servicios y despliegue contenerizado. |
 
-*(Ver diagrama de arquitectura más abajo)*
+---
+
+## 🏗 Arquitectura del Sistema
+
+El flujo combina comunicación síncrona para integridad de datos y asíncrona para tareas en segundo plano.
 
 ```mermaid
 graph TD
     %% Estilos
     classDef go fill:#00ADD8,stroke:#333,stroke-width:2px,color:white;
     classDef python fill:#3776AB,stroke:#333,stroke-width:2px,color:white;
-    classDef node fill:#68A063,stroke:#333,stroke-width:2px,color:white;
+    classDef node fill:#E0234E,stroke:#333,stroke-width:2px,color:white;
     classDef php fill:#777BB4,stroke:#333,stroke-width:2px,color:white;
     classDef db fill:#e1e1e1,stroke:#333,stroke-width:1px;
     classDef msg fill:#ff9900,stroke:#333,stroke-width:2px,color:white;
 
-    User((Cliente Web/App)) -- REST/JSON --> Gateway
+    User((Cliente HTTP)) -- REST POST --> Gateway
 
-    subgraph "BFF & Orchestration"
-        Gateway[API Gateway <br/> NestJS/TypeScript]:::node
-        Auth[Auth Service <br/> JWT]:::node
+    subgraph "Orchestration Layer"
+        Gateway[API Gateway <br/> NestJS]:::node
     end
 
-    subgraph "Core Services"
+    subgraph "Synchronous Core"
         Inventory[Inventory Service <br/> Golang]:::go
         InvDB[(PostgreSQL <br/> Stock)]:::db
     end
 
-    subgraph "Async Workers"
-        Analytics[Data Service <br/> Python FastAPI]:::python
+    subgraph "Asynchronous Workers"
+        Analytics[Analytics Service <br/> Python]:::python
         AnaDB[(MongoDB <br/> Metrics)]:::db
-        Notif[Webhook/Email Service <br/> PHP Symfony]:::php
+        Notif[Notification Service <br/> PHP]:::php
     end
 
     %% Infraestructura
     Queue{RabbitMQ <br/> Event Bus}:::msg
 
     %% Relaciones
-    Gateway -- Valida Token --> Auth
-    Gateway -- gRPC (Síncrono) --> Inventory
-    Inventory --- InvDB
+    Gateway -- "gRPC (Proto)" --> Inventory
+    Inventory <--> InvDB
     
-    Gateway -- Publish 'OrderCreated' --> Queue
+    Gateway -- "Event: product_sold" --> Queue
     
-    Queue -- Consume Event --> Analytics
-    Analytics --- AnaDB
+    Queue -- Subscribe --> Analytics
+    Analytics -- Insert --> AnaDB
     
-    Queue -- Consume Event --> Notif
-    Notif -- POST Webhook --> External((Cliente Externo))
+    Queue -- Subscribe --> Notif
+    Notif -- "Email Log" --> Console((Output))
 ```
-PolyglotMicro/
-├── api-gateway/       # Node.js (NestJS)
-├── inventory-service/ # Go (Golang)
-├── analytics-service/ # Python (FastAPI)
-├── notification-svc/  # PHP (Symfony)
-├── protos/            # Definiciones gRPC (.proto) compartidas
-└── docker-compose.yml # Orquestación
-
-## 🛠 Instalación y Despliegue
-
-La infraestructura está totalmente contenerizada. No necesitas instalar Go o Python localmente.
-
-### Prerrequisitos
-* Docker & Docker Compose
-
-### Pasos
-1. Clonar el repositorio:
-    git clone [https://github.com/systaxiecuador/polyglot-micro.git](https://github.com/systaxiecuador/polyglot-micro.git)
-    cd polyglot-micro
-2. Configurar variables de entorno
-    cp .env.example .env
-2. Levantar el ecosistema:
-    docker-compose up --build -d
-3. Acceder a la documentacion de la API:
-    http://localhost:3000/api/docs
-
-Autor: Oscar Ordoñez
-Desarrollado como parte de mi portafolio profesional backend.
-
-LinkedIn: https://www.linkedin.com/in/oscarordonez0102/
-
-Email: systaxiecuador@gmail.com
+---
+📊 Dashboards y ObservabilidadEl proyecto incluye interfaces gráficas para monitorear cada aspecto del sistema sin usar comandos de terminal.HerramientaURL LocalDescripciónCredencialesSwagger UIhttp://localhost:3000/api/docsDocumentación interactiva y prueba de Endpoints.N/AMongo Expresshttp://localhost:8081Visualizador de base de datos NoSQL (Analytics).admin / passRabbitMQ UIhttp://localhost:15672Monitoreo de colas de mensajes y exchanges.guest / guest🛠 Instalación y DespliegueTodo el sistema está contenerizado. No se requiere instalar lenguajes específicos localmente.PrerrequisitosDocker EngineDocker ComposePasosClonar el repositorio:Bashgit clone [https://github.com/systaxiecuador/polyglot-micro.git](https://github.com/systaxiecuador/polyglot-micro.git)
+cd polyglot-micro
+Configurar entorno:Bashcp .env.example .env
+Desplegar servicios:Bashdocker-compose up -d --build
+Verificar estado:Bashdocker ps
+🧪 Cómo Probar (Testing)1. Realizar una Compra (Vía Swagger o Postman)Envía una petición POST al Gateway. Esto reducirá stock en Postgres (Go) y disparará eventos a RabbitMQ.Endpoint: POST /inventory/decreaseBody:JSON{
+  "product_id": 1,
+  "quantity": 2,
+  "order_id": "ORD-2024-001"
+}
+2. Verificar ResultadosStock: Consulta GET /inventory/1 para ver la reducción en tiempo real.Analítica: Abre Mongo Express (localhost:8081) -> Base de datos analytics_db -> Colección sales_events. Verás el registro JSON de la venta.Notificación: Revisa los logs del servicio PHP para ver la simulación de envío:Bashdocker logs svc_notifications
+📂 Estructura del ProyectoPlaintextPolyglotMicro/
+├── api-gateway/           # NestJS (Controllers, Swagger, gRPC Client)
+├── inventory-service/     # Go (Server gRPC, PostgreSQL Driver)
+├── analytics-service/     # Python (RabbitMQ Consumer, PyMongo)
+├── notification-service/  # PHP (RabbitMQ Consumer, Mail Logic)
+├── protos/                # Contratos Protocol Buffers compartidos
+├── docker-compose.yml     # Orquestación
+└── README.md              # Documentación
+Autor: Oscar OrdoñezBackend Developer | Microservices Enthusiast LinkedIn | GitHub

@@ -1,0 +1,161 @@
+name: polyglot-micro
+
+services:
+  # ----------------------------------------------------------------
+  # 1. INFRAESTRUCTURA (Bases de Datos & Broker)
+  # ----------------------------------------------------------------
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: polyglot_rabbitmq
+    ports:
+      - "5672:5672"   # AMQP Protocol
+      - "15672:15672" # Management UI
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASS}
+    networks:
+      - microservices-net
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "-q", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  postgres_inventory:
+    image: postgres:15-alpine
+    container_name: polyglot_postgres
+    ports:
+      - "5432:5432"
+    environment:
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_DB: inventory_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - microservices-net
+
+  mongo_analytics:
+    image: mongo:6.0
+    container_name: polyglot_mongo
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - microservices-net
+
+  redis_cache:
+    image: redis:alpine
+    container_name: polyglot_redis
+    ports:
+      - "6379:6379"
+    networks:
+      - microservices-net
+  mongo-express:
+    image: mongo-express
+    container_name: polyglot_mongo_ui
+    restart: always
+    ports:
+      - "8081:8081"
+    environment:
+      # Conexión a la base de datos (usamos el nombre del servicio de mongo)
+      - ME_CONFIG_MONGODB_SERVER=mongo_analytics
+      - ME_CONFIG_MONGODB_PORT=27017
+      # Credenciales para entrar a la Interfaz Web (Usuario/Clave del panel)
+      - ME_CONFIG_BASICAUTH_USERNAME=admin
+      - ME_CONFIG_BASICAUTH_PASSWORD=pass
+    depends_on:
+      - mongo_analytics
+    networks:
+      - microservices-net
+  # ----------------------------------------------------------------
+  # 2. MICROSERVICIOS (Aplicación)
+  # ----------------------------------------------------------------
+
+  # NODE.JS (NestJS) - API Gateway
+  api-gateway:
+    build:
+      context: ./api-gateway
+      dockerfile: Dockerfile
+    container_name: svc_gateway
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - INVENTORY_GRPC_URL=svc_inventory:50051
+      - PROTO_PATH=/protos/inventory.proto
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+      inventory-service:
+        condition: service_started
+    networks:
+      - microservices-net
+    volumes:
+      - ./protos:/protos  # Montamos la carpeta local protos en /protos del contenedor
+
+  # GO (Golang) - Inventory Service
+  inventory-service:
+    build:
+      context: ./inventory-service
+      dockerfile: Dockerfile
+    container_name: svc_inventory
+    restart: always
+    ports:
+      - "50051:50051" # Exponer gRPC para debugging local
+    environment:
+      - DB_HOST=postgres_inventory
+      - DB_USER=${DB_USER}
+      - DB_PASS=${DB_PASS}
+      - DB_NAME=inventory_db
+      - GRPC_PORT=50051
+    depends_on:
+      - postgres_inventory
+    networks:
+      - microservices-net
+
+  # PYTHON (FastAPI) - Analytics Service
+  analytics-service:
+    build:
+      context: ./analytics-service
+      dockerfile: Dockerfile
+    container_name: svc_analytics
+    environment:
+      - MONGO_URI=mongodb://mongo_analytics:27017
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+      - PYTHONUNBUFFERED=1
+    depends_on:
+      mongo_analytics:
+        condition: service_started
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-net
+
+  # PHP (Symfony) - Notification Service
+  notification-service:
+    build:
+      context: ./notification-service
+      dockerfile: Dockerfile
+    container_name: svc_notifications
+    environment:
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASS}@rabbitmq:5672
+    depends_on:
+      rabbitmq:
+        condition: service_healthy
+    networks:
+      - microservices-net
+
+# ----------------------------------------------------------------
+# 3. REDES Y VOLÚMENES
+# ----------------------------------------------------------------
+networks:
+  microservices-net:
+    driver: bridge
+
+volumes:
+  postgres_data:
+  mongo_data:
