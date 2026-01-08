@@ -76,18 +76,45 @@ graph TD
     Notif -- "Email Log" --> Console((Output))
 ```
 ---
-📊 Dashboards y ObservabilidadEl proyecto incluye interfaces gráficas para monitorear cada aspecto del sistema sin usar comandos de terminal.HerramientaURL LocalDescripciónCredencialesSwagger UIhttp://localhost:3000/api/docsDocumentación interactiva y prueba de Endpoints.N/AMongo Expresshttp://localhost:8081Visualizador de base de datos NoSQL (Analytics).admin / passRabbitMQ UIhttp://localhost:15672Monitoreo de colas de mensajes y exchanges.guest / guest🛠 Instalación y DespliegueTodo el sistema está contenerizado. No se requiere instalar lenguajes específicos localmente.PrerrequisitosDocker EngineDocker ComposePasosClonar el repositorio:Bashgit clone [https://github.com/systaxiecuador/polyglot-micro.git](https://github.com/systaxiecuador/polyglot-micro.git)
+## 📊 Dashboards y Observabilidad
+El proyecto incluye interfaces gráficas para monitorear cada aspecto del sistema sin usar comandos de terminal.
+## HerramientaURL 
+LocalDescripciónCredencialesSwagger UI
+http://localhost:3000/api/docs
+
+Documentación interactiva y prueba de Endpoints.N/AMongo Express
+http://localhost:8081
+Visualizador de base de datos NoSQL (Analytics).admin / pass
+RabbitMQ UI
+http://localhost:15672
+Monitoreo de colas de mensajes y exchanges.guest / guest
+## 🛠 Instalación y Despliegue
+Todo el sistema está contenerizado. No se requiere instalar lenguajes específicos localmente.Prerrequisitos
+Docker 
+EngineDocker 
+Compose
+PasosClonar el repositorio:
+git clone [https://github.com/systaxiecuador/polyglot-micro.git](https://github.com/systaxiecuador/polyglot-micro.git)
 cd polyglot-micro
 Configurar entorno:Bashcp .env.example .env
 Desplegar servicios:Bashdocker-compose up -d --build
 Verificar estado:Bashdocker ps
-🧪 Cómo Probar (Testing)1. Realizar una Compra (Vía Swagger o Postman)Envía una petición POST al Gateway. Esto reducirá stock en Postgres (Go) y disparará eventos a RabbitMQ.Endpoint: POST /inventory/decreaseBody:JSON{
+## 🧪 Cómo Probar (Testing)
+1. Realizar una Compra (Vía Swagger o Postman)
+Envía una petición POST al Gateway. 
+Esto reducirá stock en Postgres (Go) y disparará eventos a RabbitMQ.Endpoint: 
+POST /inventory/decreaseBody:JSON{
   "product_id": 1,
   "quantity": 2,
   "order_id": "ORD-2024-001"
 }
-2. Verificar ResultadosStock: Consulta GET /inventory/1 para ver la reducción en tiempo real.Analítica: Abre Mongo Express (localhost:8081) -> Base de datos analytics_db -> Colección sales_events. Verás el registro JSON de la venta.Notificación: Revisa los logs del servicio PHP para ver la simulación de envío:Bashdocker logs svc_notifications
-📂 Estructura del ProyectoPlaintextPolyglotMicro/
+2. Verificar ResultadosStock: 
+Consulta GET /inventory/1 para ver la reducción en tiempo real.
+Analítica: Abre Mongo Express (localhost:8081) -> Base de datos analytics_db -> Colección sales_events. Verás el registro JSON de la venta.
+Notificación: Revisa los logs del servicio PHP para ver la simulación de envío:
+docker logs svc_notifications
+
+## 📂 Estructura del ProyectoPlaintextPolyglotMicro/
 ├── api-gateway/           # NestJS (Controllers, Swagger, gRPC Client)
 ├── inventory-service/     # Go (Server gRPC, PostgreSQL Driver)
 ├── analytics-service/     # Python (RabbitMQ Consumer, PyMongo)
@@ -95,4 +122,5 @@ Verificar estado:Bashdocker ps
 ├── protos/                # Contratos Protocol Buffers compartidos
 ├── docker-compose.yml     # Orquestación
 └── README.md              # Documentación
-Autor: Oscar OrdoñezBackend Developer | Microservices Enthusiast LinkedIn | GitHub
+
+## Autor: Oscar OrdoñezBackend Developer | Microservices Enthusiast LinkedIn | GitHub
