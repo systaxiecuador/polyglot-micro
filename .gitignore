@@ -1,0 +1,42 @@
+# --- Global ---
+.DS_Store
+.vscode/
+.idea/
+*.log
+.env
+
+# --- Node.js (API Gateway) ---
+api-gateway/node_modules/
+api-gateway/dist/
+api-gateway/coverage/
+api-gateway/npm-debug.log*
+api-gateway/yarn-debug.log*
+api-gateway/yarn-error.log*
+
+# --- Go (Inventory Service) ---
+# Binaries
+inventory-service/bin/
+inventory-service/main
+inventory-service/*.exe
+inventory-service/*.test
+inventory-service/*.out
+# Dependency directories
+inventory-service/vendor/
+
+# --- Python (Analytics Service) ---
+analytics-service/__pycache__/
+analytics-service/*.py[cod]
+analytics-service/*$py.class
+analytics-service/venv/
+analytics-service/env/
+analytics-service/.pytest_cache/
+analytics-service/.coverage
+
+# --- PHP (Notification Service) ---
+notification-service/vendor/
+notification-service/.phpunit.result.cache
+
+# --- Docker & Local Data ---
+# Ignore local volume mounts if you ever switch from named volumes to local folders
+postgres_data/
+mongo_data/
